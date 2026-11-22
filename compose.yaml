@@ -1,0 +1,40 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      - GREETING=${APP_GREETING:-Hello, Docker!}
+      - STORAGE=redis
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONDONTWRITEBYTECODE=1 # Чтобы Python не пытался писать файлы в read-only среду
+    user: "1000:1000" # Запуск не от root (UID 1000 - обычно ваш пользователь)
+    read_only: true # Корневая ФС только для чтения
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp # Выделяем временную папку в оперативке, чтобы приложению было куда писать
+    mem_limit: 256m # Лимит памяти
+    cpus: 1.0 # Лимит ядер
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  redis-data:
